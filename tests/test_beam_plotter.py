@@ -1,41 +1,13 @@
-"""
-test_beam_plotter.py
-====================
-Phase 2 unit tests for src/beam_plotter.py.
-
-All tests use the non-interactive Agg backend so no GUI window is opened.
-Phase 1 tests in test_beam_analysis.py are completely unmodified; running
-``pytest tests/`` executes both suites together.
-
-Test categories
----------------
-1.  Figure and axes creation — correct type, 3 subplots.
-2.  Successful plotting for the sample beam (Phase 1 config).
-3.  Three or more point loads + triangular UVL.
-4.  Trapezoidal UVL.
-5.  UVL over the full span.
-6.  UVL over a partial span.
-7.  Shear discontinuities at point loads (correct jump magnitudes).
-8.  Bending moment continuity at point loads.
-9.  Correct zero-moment support boundaries (M(0) == M(L) == 0).
-10. Maximum bending moment reporting via find_bending_moment_extrema.
-11. Plotting without showing a GUI window (show=False).
-12. SFD array — NaN segments present at each point-load position.
-13. BMD array — starts and ends at zero.
-14. Extrema positions lie strictly inside [0, L] for standard configs.
-"""
-
 import sys
 import os
 
 import numpy as np
 import matplotlib
-# Force non-interactive backend BEFORE any other matplotlib import
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pytest
 
-# Allow import from project root
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from src.beam_analysis import (
@@ -54,16 +26,13 @@ from src.beam_plotter import (
     _build_bmd_arrays,
 )
 
-ATOL = 1e-6   # loose tolerance for floating-point spot checks in plots
+ATOL = 1e-6   
 
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 @pytest.fixture(autouse=True)
 def close_all_figures():
-    """Automatically close all Matplotlib figures after every test."""
+
     yield
     plt.close("all")
 
@@ -72,34 +41,34 @@ def _make_beam(L, loads, uvl=None):
     return BeamConfig(length=L, point_loads=loads, uvl=uvl)
 
 
-# Typical 3-load, no-UVL beam
+
 BEAM_3PL = _make_beam(
     8.0,
     [PointLoad(10.0, 2.0), PointLoad(20.0, 5.0), PointLoad(30.0, 7.0)],
 )
 
-# Triangular UVL (ascending)
+
 BEAM_TRI = _make_beam(
     10.0,
     [PointLoad(5.0, 1.0), PointLoad(10.0, 5.0), PointLoad(5.0, 9.0)],
     UVL(a=2.0, b=8.0, w_a=0.0, w_b=20.0),
 )
 
-# Trapezoidal UVL
+
 BEAM_TRAP = _make_beam(
     12.0,
     [PointLoad(15.0, 3.0), PointLoad(25.0, 6.0), PointLoad(10.0, 9.0)],
     UVL(a=2.0, b=10.0, w_a=8.0, w_b=24.0),
 )
 
-# UVL over the full span (uniform)
+
 BEAM_FULL_UVL = _make_beam(
     10.0,
     [PointLoad(0.0, 0.0), PointLoad(0.0, 5.0), PointLoad(0.0, 10.0)],
     UVL(a=0.0, b=10.0, w_a=20.0, w_b=20.0),
 )
 
-# UVL over partial span
+
 BEAM_PART_UVL = _make_beam(
     12.0,
     [PointLoad(0.0, 0.0), PointLoad(0.0, 6.0), PointLoad(0.0, 12.0)],
@@ -107,12 +76,8 @@ BEAM_PART_UVL = _make_beam(
 )
 
 
-# ===========================================================================
-# 1. Figure and axes creation
-# ===========================================================================
 
 class TestFigureCreation:
-    """plot_beam_diagrams must return a Figure and exactly three Axes."""
 
     def test_returns_figure(self):
         fig, axes = plot_beam_diagrams(sample_beam(), show=False)
@@ -133,12 +98,7 @@ class TestFigureCreation:
         assert len(fig.axes) == 3
 
 
-# ===========================================================================
-# 2. Successful plotting for the Phase 1 sample beam
-# ===========================================================================
-
 class TestSampleBeamPlot:
-    """Basic smoke tests: the sample beam should plot without error."""
 
     def test_plot_sample_beam_no_exception(self):
         fig, axes = plot_beam_diagrams(sample_beam(), show=False)
@@ -146,7 +106,6 @@ class TestSampleBeamPlot:
 
     def test_sfd_axis_has_lines(self):
         _, (_, ax_sfd, _) = plot_beam_diagrams(sample_beam(), show=False)
-        # At least one Line2D should be present in the SFD
         assert len(ax_sfd.lines) > 0
 
     def test_bmd_axis_has_lines(self):
@@ -158,10 +117,6 @@ class TestSampleBeamPlot:
         _, (ax_load, _, _) = plot_beam_diagrams(sample_beam(), show=False)
         assert len(ax_load.patches) > 0
 
-
-# ===========================================================================
-# 3. Three or more point loads + triangular UVL
-# ===========================================================================
 
 class TestTriangularUVLPlot:
     """Plots with a triangular UVL should succeed and produce valid data."""
@@ -181,17 +136,12 @@ class TestTriangularUVLPlot:
         assert abs(M[-1]) < ATOL
 
 
-# ===========================================================================
-# 4. Trapezoidal UVL
-# ===========================================================================
-
 class TestTrapezoidalUVLPlot:
     def test_no_exception(self):
         fig, _ = plot_beam_diagrams(BEAM_TRAP, show=False)
         assert fig is not None
 
     def test_bmd_continuous(self):
-        """BMD values at point-load positions must be identical from both sides."""
         _EPS = 1e-9
         for pl in BEAM_TRAP.point_loads:
             M_left  = bending_moment(BEAM_TRAP, pl.position - _EPS)
@@ -205,11 +155,6 @@ class TestTrapezoidalUVLPlot:
         """SFD array must contain NaN values (the jump markers)."""
         x, V = _build_sfd_arrays(BEAM_TRAP)
         assert np.isnan(V).any(), "Expected NaN markers at shear jumps"
-
-
-# ===========================================================================
-# 5. UVL over the full span
-# ===========================================================================
 
 class TestFullSpanUVLPlot:
     def test_no_exception(self):
@@ -226,11 +171,6 @@ class TestFullSpanUVLPlot:
         assert abs(M[0]) < ATOL
         assert abs(M[-1]) < ATOL
 
-
-# ===========================================================================
-# 6. UVL over a partial span
-# ===========================================================================
-
 class TestPartialSpanUVLPlot:
     def test_no_exception(self):
         fig, _ = plot_beam_diagrams(BEAM_PART_UVL, show=False)
@@ -240,7 +180,6 @@ class TestPartialSpanUVLPlot:
         """Before the UVL starts (x < a), shear should be constant (no distributed load)."""
         config = BEAM_PART_UVL
         uvl_a = config.uvl.a
-        # Sample three points before the UVL starts
         xs = np.linspace(0.01, uvl_a - 0.01, 5)
         V_vals = [shear_force(config, x) for x in xs]
         for v in V_vals:
@@ -249,13 +188,7 @@ class TestPartialSpanUVLPlot:
             )
 
 
-# ===========================================================================
-# 7. Shear discontinuities at point loads
-# ===========================================================================
-
 class TestShearDiscontinuities:
-    """shear_force jumps by exactly P at each point-load position."""
-
     _EPS = 1e-8
 
     def _check_jumps(self, config):
@@ -264,7 +197,7 @@ class TestShearDiscontinuities:
                 continue
             V_left  = shear_force(config, pl.position - self._EPS)
             V_right = shear_force(config, pl.position + self._EPS)
-            jump    = V_left - V_right          # should equal pl.magnitude
+            jump    = V_left - V_right         
             assert abs(jump - pl.magnitude) < 1e-4, (
                 f"Shear jump at x={pl.position}: expected {pl.magnitude}, "
                 f"got {jump:.6f}"
@@ -280,28 +213,17 @@ class TestShearDiscontinuities:
         self._check_jumps(BEAM_TRI)
 
     def test_sfd_nan_count_equals_nonzero_load_count(self):
-        """
-        The SFD array should contain at least one NaN per non-zero point load,
-        because those are the jump markers.
-        """
         config = BEAM_3PL
         x, V = _build_sfd_arrays(config)
         num_nans = int(np.isnan(V).sum())
         nonzero_loads = sum(1 for pl in config.point_loads
                             if abs(pl.magnitude) >= 1e-12)
-        # Each non-zero load generates at least one NaN segment
         assert num_nans >= nonzero_loads, (
             f"Expected ≥{nonzero_loads} NaNs, got {num_nans}"
         )
 
 
-# ===========================================================================
-# 8. Bending moment continuity at point loads
-# ===========================================================================
-
 class TestBMContinuity:
-    """M(x) must be continuous at every point-load position."""
-
     _EPS = 1e-9
 
     def _check_continuity(self, config):
@@ -322,13 +244,7 @@ class TestBMContinuity:
     def test_continuity_trapezoidal_uvl(self):
         self._check_continuity(BEAM_TRAP)
 
-
-# ===========================================================================
-# 9. Zero-moment support boundaries
-# ===========================================================================
-
 class TestZeroMomentBoundaries:
-    """M(0) == 0 and M(L) == 0 for all test configurations."""
 
     def _check(self, config):
         L = config.length
@@ -366,12 +282,7 @@ class TestZeroMomentBoundaries:
             assert abs(M[-1]) < ATOL, f"BMD[-1] = {M[-1]:.6e} for {config}"
 
 
-# ===========================================================================
-# 10. Maximum bending moment reporting
-# ===========================================================================
-
 class TestMaxBendingMoment:
-    """find_bending_moment_extrema must return a valid ExtremaResult dict."""
 
     def test_returns_dict_with_required_keys(self):
         result = find_bending_moment_extrema(sample_beam())
@@ -383,8 +294,6 @@ class TestMaxBendingMoment:
         assert required_keys.issubset(result.keys())
 
     def test_max_positive_non_negative(self):
-        """Simply supported beams under downward loads have M ≥ 0 everywhere
-        (for typical loading); the max must be non-negative."""
         result = find_bending_moment_extrema(sample_beam())
         assert result["max_positive_value"] >= -ATOL
 
@@ -408,10 +317,6 @@ class TestMaxBendingMoment:
         assert isinstance(result["note"], str)
 
     def test_max_value_consistent_with_engine(self):
-        """
-        The reported maximum should equal bending_moment evaluated at its
-        reported position (within numerical tolerance).
-        """
         config = sample_beam()
         result = find_bending_moment_extrema(config)
         x_max = result["max_positive_pos"]
@@ -419,18 +324,12 @@ class TestMaxBendingMoment:
         assert abs(M_check - result["max_positive_value"]) < ATOL
 
     def test_extrema_for_symmetric_udl(self):
-        """
-        Symmetric UDL on L=10m: max moment at midspan (x=5).
-        R_A = R_B = 100 kN, w=20 kN/m → M(5) = 100*5 - 20*5*2.5 = 500-250=250 kN·m
-        """
         config = BEAM_FULL_UVL
         result = find_bending_moment_extrema(config)
-        # Midspan moment for uniform load: w*L²/8 = 20*100/8 = 250 kN·m
         assert abs(result["max_positive_value"] - 250.0) < ATOL
-        assert abs(result["max_positive_pos"] - 5.0) < 0.005   # within 5 mm
+        assert abs(result["max_positive_pos"] - 5.0) < 0.005  
 
     def test_three_point_loads_max_at_load_or_between(self):
-        """Maximum moment must be ≥ moment at each load position."""
         config = BEAM_3PL
         result = find_bending_moment_extrema(config)
         M_max_reported = result["max_positive_value"]
@@ -441,27 +340,19 @@ class TestMaxBendingMoment:
                 f"{pl.position}: {M_at_load}"
             )
 
-
-# ===========================================================================
-# 11. Plotting without showing a GUI window
-# ===========================================================================
-
 class TestNoGUI:
-    """show=False must never open a GUI and still return the figure."""
 
     def test_no_show_returns_figure(self):
         fig, axes = plot_beam_diagrams(sample_beam(), show=False)
         assert fig is not None
 
     def test_no_show_does_not_raise(self):
-        """Should not raise any display-related exception in headless mode."""
         try:
             fig, _ = plot_beam_diagrams(sample_beam(), show=False)
         except Exception as e:
             pytest.fail(f"plot_beam_diagrams raised: {e}")
 
     def test_figure_saveable_to_bytes(self):
-        """The figure can be saved to an in-memory buffer — essential for Streamlit."""
         import io
         fig, _ = plot_beam_diagrams(sample_beam(), show=False)
         buf = io.BytesIO()
@@ -470,20 +361,13 @@ class TestNoGUI:
         assert len(buf.read()) > 0
 
 
-# ===========================================================================
-# 12. SFD array — NaN segments at each point-load position
-# ===========================================================================
-
 class TestSFDArray:
-    """Internal _build_sfd_arrays helper: verify NaN placement and coverage."""
 
     def test_nan_present_for_nonzero_loads(self):
-        """Non-zero point loads must produce NaN entries in the V array."""
         x, V = _build_sfd_arrays(BEAM_3PL)
         assert np.isnan(V).any()
 
     def test_finite_values_cover_full_span(self):
-        """Finite x-values must cover both x≈0 and x≈L."""
         L = BEAM_3PL.length
         x, V = _build_sfd_arrays(BEAM_3PL)
         finite_x = x[~np.isnan(V)]
@@ -491,7 +375,6 @@ class TestSFDArray:
         assert finite_x.max() > 0.95 * L
 
     def test_shear_starts_at_R_A(self):
-        """The first finite shear value should equal R_A (within tolerance)."""
         config = BEAM_3PL
         R_A, _ = calculate_reactions(config)
         x, V = _build_sfd_arrays(config)
@@ -499,20 +382,13 @@ class TestSFDArray:
         assert abs(first_finite_V - R_A) < ATOL
 
     def test_shear_ends_near_neg_R_B(self):
-        """The last finite shear value should be ≈ −R_B."""
         config = BEAM_3PL
         _, R_B = calculate_reactions(config)
         x, V = _build_sfd_arrays(config)
         last_finite_V = V[~np.isnan(V)][-1]
         assert abs(last_finite_V + R_B) < ATOL
 
-
-# ===========================================================================
-# 13. BMD array — starts and ends at zero
-# ===========================================================================
-
 class TestBMDArray:
-    """Internal _build_bmd_arrays helper: boundary and monotone checks."""
 
     def test_starts_at_zero(self):
         x, M = _build_bmd_arrays(sample_beam())
@@ -536,7 +412,6 @@ class TestBMDArray:
         assert np.all(np.diff(x) >= 0), "x-array is not monotonically increasing"
 
     def test_includes_critical_points(self):
-        """BMD x-array must include all point-load positions."""
         config = sample_beam()
         x, _ = _build_bmd_arrays(config)
         for pl in config.point_loads:
@@ -545,18 +420,12 @@ class TestBMDArray:
             )
 
 
-# ===========================================================================
-# 14. Extrema positions for standard configs
-# ===========================================================================
-
 class TestExtremaPositions:
-    """For typical downward loading, max M lies strictly between 0 and L."""
 
     def _interior_max(self, config):
         L = config.length
         result = find_bending_moment_extrema(config)
         pos = result["max_positive_pos"]
-        # Allow endpoints for pathological cases but warn
         return pos, L
 
     def test_sample_beam_interior_max(self):
@@ -564,7 +433,6 @@ class TestExtremaPositions:
         L = config.length
         result = find_bending_moment_extrema(config)
         pos = result["max_positive_pos"]
-        # Max cannot exceed the full span
         assert 0.0 <= pos <= L
 
     def test_three_load_beam_interior_max(self):
@@ -575,7 +443,6 @@ class TestExtremaPositions:
         assert 0.0 <= pos <= L
 
     def test_extrema_values_bounded_by_simple_estimate(self):
-        """Max moment must be less than the product of max load × span."""
         config = sample_beam()
         L = config.length
         max_possible = sum(pl.magnitude for pl in config.point_loads) * L

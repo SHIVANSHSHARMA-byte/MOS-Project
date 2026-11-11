@@ -1,18 +1,3 @@
-"""
-app.py
-======
-Beam Analysis Studio — SFD & BMD
-Phase 3: Interactive Streamlit Dashboard for Simply Supported Beam Analysis.
-
-Provides:
-- Beam geometry and loading configuration (point loads, UVL, supports).
-- Live validation with helpful error messages.
-- Real-time reaction calculations (R_A, R_B) and bending moment extrema.
-- Three-panel diagrams: Loading, SFD, and BMD.
-- Numerical results table with sampling and custom section evaluation.
-- Diagram (PNG) and data (CSV) export capabilities.
-"""
-
 from __future__ import annotations
 
 import io
@@ -23,12 +8,12 @@ from typing import List, Tuple, Optional, Dict, Any
 import numpy as np
 import pandas as pd
 import matplotlib
-# Use Agg backend for headless / server-safe figure rendering
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import streamlit as st
 
-# Ensure project root is in sys.path
+
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from src.beam_analysis import (
@@ -49,9 +34,7 @@ from src.beam_report import generate_beam_pdf_report
 from src.beam_validation import verify_static_equilibrium
 
 
-# ===========================================================================
-# Helper Functions (tested in test_app.py)
-# ===========================================================================
+
 
 def validate_inputs(
     length: float,
@@ -62,39 +45,20 @@ def validate_inputs(
     uvl_w_a: float,
     uvl_w_b: float,
 ) -> Tuple[bool, List[str], Optional[BeamConfig]]:
-    """
-    Validate user inputs and construct a BeamConfig if valid.
-
-    Parameters
-    ----------
-    length : float
-        Beam span in metres.
-    point_loads : List[Dict[str, float]]
-        List of dicts with keys 'magnitude' (kN) and 'position' (m).
-    uvl_enabled : bool
-        Whether a UVL is applied.
-    uvl_a, uvl_b : float
-        UVL start and end positions in metres.
-    uvl_w_a, uvl_w_b : float
-        UVL intensities in kN/m at positions a and b.
-
-    Returns
-    -------
-    (is_valid, error_messages, config)
-    """
+    
     errors: List[str] = []
 
-    # 1. Beam length validation
+
     if length <= 0.0:
         errors.append(f"Beam length must be strictly positive (L > 0). Got {length:.3f} m.")
 
-    # 2. Point load count
+
     if len(point_loads) < 3:
         errors.append(
             f"At least three concentrated point loads are required. Currently configured: {len(point_loads)}."
         )
 
-    # 3. Point load bounds
+
     for idx, pl in enumerate(point_loads):
         pos = pl.get("position", 0.0)
         mag = pl.get("magnitude", 0.0)
@@ -103,7 +67,7 @@ def validate_inputs(
                 f"Point load #{idx + 1} position ({pos:.3f} m) must be within beam span [0.0, {length:.3f}] m."
             )
 
-    # 4. UVL validation if enabled
+
     constructed_uvl: Optional[UVL] = None
     if uvl_enabled:
         if not (0.0 <= uvl_a < uvl_b <= length):
@@ -125,7 +89,7 @@ def validate_inputs(
     if errors:
         return False, errors, None
 
-    # Construct BeamConfig
+
     pl_objs = [
         PointLoad(magnitude=float(p["magnitude"]), position=float(p["position"]))
         for p in point_loads
@@ -136,7 +100,7 @@ def validate_inputs(
         uvl=constructed_uvl,
     )
 
-    # Run calculation engine's internal validator
+
     try:
         validate_beam(config)
     except ValueError as ve:
@@ -149,14 +113,11 @@ def generate_numerical_table(
     config: BeamConfig,
     num_samples: int = 21,
 ) -> pd.DataFrame:
-    """
-    Generate a table of positions x, shear forces V(x), and bending moments M(x).
-    Includes beam endpoints, all point-load locations, UVL endpoints, and regular samples.
-    """
+    
     L = config.length
     _EPS = 1e-9
 
-    # Collect critical points
+
     critical_pts = {0.0, L}
     for pl in config.point_loads:
         critical_pts.add(pl.position)
@@ -164,16 +125,16 @@ def generate_numerical_table(
         critical_pts.add(config.uvl.a)
         critical_pts.add(config.uvl.b)
 
-    # Uniform sample grid
+
     grid_pts = set(np.linspace(0.0, L, max(num_samples, 2)))
     all_pts = sorted(critical_pts | grid_pts)
 
     rows = []
     for x in all_pts:
-        # Check if x is at a point load location
+
         is_pl = any(abs(pl.position - x) < 1e-8 for pl in config.point_loads)
         
-        # Left limit V(x-) and Right limit V(x+)
+
         if x == 0.0:
             v_left = np.nan
             v_right = shear_force(config, _EPS)
@@ -204,9 +165,7 @@ def evaluate_custom_section(
     config: BeamConfig,
     x: float,
 ) -> Dict[str, Any]:
-    """
-    Evaluate shear force and bending moment at a custom section x with left/right conventions.
-    """
+    
     _EPS = 1e-9
     L = config.length
     if not (0.0 <= x <= L):
@@ -229,12 +188,9 @@ def evaluate_custom_section(
     }
 
 
-# ===========================================================================
-# Streamlit Dashboard UI
-# ===========================================================================
+
 
 def init_session_state():
-    """Initialize session state defaults matching sample_beam()"""
     if "initialized" not in st.session_state:
         st.session_state.initialized = True
         sample = sample_beam()
@@ -257,7 +213,6 @@ def init_session_state():
 
 
 def reset_to_sample_beam():
-    """Reset session state to sample_beam configuration."""
     sample = sample_beam()
     st.session_state.beam_length = float(sample.length)
     st.session_state.point_loads = [
@@ -281,7 +236,7 @@ def main():
 
     init_session_state()
 
-    # ── Application Header ─────────────────────────────────────────────────
+
     st.title(" Beam Analysis Studio — SFD & BMD")
     st.markdown(
         """
@@ -293,7 +248,7 @@ def main():
     )
     st.divider()
 
-    # ── Sidebar Configuration ──────────────────────────────────────────────
+
     with st.sidebar:
         st.header("⚙️ Beam Configuration")
 
@@ -317,15 +272,14 @@ def main():
 
         st.divider()
 
-        # ── Point Loads ────────────────────────────────────────────────────
+
         st.subheader("2. Concentrated Point Loads (≥ 3)")
         st.caption("Downward loads are positive (+kN). Positions must be within [0, L] m.")
 
-        # Controls to add/remove loads
         col_add, col_rem = st.columns(2)
         with col_add:
             if st.button("➕ Add Load", use_container_width=True):
-                # Add default load at midspan or 3/4 span
+
                 new_pos = min(round(length * 0.5, 2), length)
                 st.session_state.point_loads.append({"magnitude": 25.0, "position": new_pos})
                 st.rerun()
@@ -337,7 +291,7 @@ def main():
                     st.session_state.point_loads.pop()
                     st.rerun()
 
-        # Dynamic load editors
+
         updated_point_loads = []
         for i, pl in enumerate(st.session_state.point_loads):
             with st.expander(f"Point Load #{i + 1}", expanded=(i < 3)):
@@ -365,7 +319,6 @@ def main():
 
         st.divider()
 
-        # ── Distributed Load (UVL) ─────────────────────────────────────────
         st.subheader("3. Distributed Load (UVL)")
         st.caption("Supports triangular, trapezoidal, or full/partial span loads.")
         uvl_enabled = st.checkbox(
@@ -427,7 +380,6 @@ def main():
 
         st.divider()
 
-        # ── Sign Convention Box ────────────────────────────────────────────
         with st.expander("ℹEngineering Conventions & Units", expanded=False):
             st.markdown(
                 """
@@ -440,7 +392,6 @@ def main():
                 """
             )
 
-    # ── Input Validation ───────────────────────────────────────────────────
     is_valid, error_msgs, config = validate_inputs(
         length=length,
         point_loads=st.session_state.point_loads,
@@ -457,15 +408,13 @@ def main():
             st.markdown(f"- {err}")
         return
 
-    # Valid Configuration Feedback
     st.success(" **Configuration Valid**: Engineering calculations and diagrams updated.")
 
-    # ── Live Engineering Calculations ──────────────────────────────────────
+
     R_A, R_B = calculate_reactions(config)
     extrema = find_bending_moment_extrema(config)
     audit = verify_static_equilibrium(config, R_A, R_B)
 
-    # ── Metric Cards ───────────────────────────────────────────────────────
     st.subheader(" Key Structural Results")
     m_col1, m_col2, m_col3, m_col4 = st.columns(4)
 
@@ -508,7 +457,7 @@ def main():
                 help="No negative (hogging) moment exists on this span under downward loads.",
             )
 
-    # Second row of metrics: Shear Extremes & Verification Audit
+
     s_col1, s_col2, s_col3 = st.columns([1.5, 1.5, 2.0])
     v_start = shear_force(config, 1e-9)
     v_end = shear_force(config, config.length - 1e-9)
@@ -540,22 +489,22 @@ def main():
 
     st.divider()
 
-    # ── Plots Section ──────────────────────────────────────────────────────
+
     st.subheader("📈 Structural Diagrams (Loading, SFD & BMD)")
 
-    # Generate figure using existing plotting engine
+
     fig, axes = plot_beam_diagrams(config, show=False, figsize=(11.0, 13.0))
 
-    # Display in Streamlit
+
     st.pyplot(fig, clear_figure=False)
 
-    # Export Diagram & Report Buttons
+
     buf = io.BytesIO()
     fig.savefig(buf, format="png", dpi=200, bbox_inches="tight")
     buf.seek(0)
-    plt.close(fig)  # Prevent Matplotlib memory accumulation
+    plt.close(fig) 
 
-    # Generate PDF report from current valid configuration
+
     pdf_bytes = None
     pdf_error = None
     try:
@@ -563,7 +512,7 @@ def main():
     except Exception as e:
         pdf_error = str(e)
 
-    # Generate CSV export data for download
+
     df_results = generate_numerical_table(config, num_samples=25)
     csv_buffer = df_results.to_csv(index=False).encode("utf-8")
 

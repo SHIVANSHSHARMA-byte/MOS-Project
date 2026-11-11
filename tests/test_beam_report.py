@@ -1,21 +1,3 @@
-"""
-test_beam_report.py
-===================
-Phase 5 unit tests for src/beam_report.py.
-
-Tests:
-1. Successful PDF generation from standard sample beam.
-2. Verification of binary signature (%PDF-) and non-empty content.
-3. PDF generation with triangular UVL.
-4. PDF generation with trapezoidal UVL.
-5. PDF generation with zero-intensity UVL.
-6. PDF generation with point-loads only (no UVL).
-7. Invalid configurations raise ValueError and abort PDF generation.
-8. Generation directly to file path vs in-memory BytesIO.
-9. Verify Matplotlib figures are cleanly closed without leaks.
-10. Verify Streamlit integration uses current configuration.
-"""
-
 import io
 import os
 import sys
@@ -23,7 +5,6 @@ import tempfile
 import pytest
 import matplotlib.pyplot as plt
 
-# Ensure project root is available
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.beam_analysis import (
@@ -36,14 +17,13 @@ from src.beam_report import generate_beam_pdf_report
 
 
 class TestPDFReportGeneration:
-    """Test PDF engineering report creation."""
 
     def test_sample_beam_pdf_generation(self):
         config = sample_beam()
         pdf_bytes = generate_beam_pdf_report(config)
 
         assert isinstance(pdf_bytes, bytes)
-        assert len(pdf_bytes) > 50000  # typical complete report is ~100-250KB
+        assert len(pdf_bytes) > 50000  
         assert pdf_bytes.startswith(b"%PDF-")
         assert b"%%EOF" in pdf_bytes[-1024:]
 
@@ -111,13 +91,11 @@ class TestPDFReportGeneration:
         assert pdf_bytes.startswith(b"%PDF-")
 
     def test_invalid_config_raises_value_error(self):
-        # Invalid length
         with pytest.raises(ValueError):
             generate_beam_pdf_report(
                 BeamConfig(length=-5.0, point_loads=[PointLoad(10.0, 1.0), PointLoad(10.0, 2.0), PointLoad(10.0, 3.0)])
             )
 
-        # Fewer than 3 point loads
         with pytest.raises(ValueError):
             generate_beam_pdf_report(
                 BeamConfig(length=10.0, point_loads=[PointLoad(10.0, 1.0), PointLoad(10.0, 2.0)])
