@@ -12,6 +12,7 @@ def independent_udl_resultant(a: float, b: float, w: float) -> Tuple[float, floa
     span = b - a
     if span <= 0:
         raise ValueError(f"Invalid UDL span: a={a}, b={b}")
+    #centroid calculations for udl
     return w * span, 0.5 * (a + b)
 
 
@@ -20,7 +21,7 @@ def independent_uvl_resultant(a: float, b: float, w_a: float, w_b: float) -> Tup
     span = b - a
     if span <= 0:
         raise ValueError(f"Invalid UVL span: a={a}, b={b}")
-
+##resultant calculate krega
     R = 0.5 * (w_a + w_b) * span
 
     if abs(w_a + w_b) < 1e-15:
@@ -30,18 +31,18 @@ def independent_uvl_resultant(a: float, b: float, w_a: float, w_b: float) -> Tup
 
         x_bar = 0.5 * (a + b)
     else:
-
+##centroid calculations for uvl 
         x_bar = (w_a * (2.0 * a + b) + w_b * (a + 2.0 * b)) / (3.0 * (w_a + w_b))
 
     return R, x_bar
 
-
+##support reactions calculate krta hai 
 def independent_calculate_reactions(config: BeamConfig) -> Tuple[float, float]:
 
     L = config.length
     if L <= 0:
         raise ValueError(f"Beam length must be positive. Got L={L}")
-
+        ## variables intialize
     moment_about_A = 0.0
     moment_about_B = 0.0
     total_vertical_load = 0.0
@@ -70,7 +71,10 @@ def independent_calculate_reactions(config: BeamConfig) -> Tuple[float, float]:
 
     return R_A, R_B
 
+##sign conventions are taken as anticlockvise is positive 
 
+
+##this checks whether calcualted moments and reactions are correct or not 
 def verify_static_equilibrium(
     config: BeamConfig,
     R_A: float,
